@@ -1,0 +1,32 @@
+name: Daily Price Dump
+
+on:
+  schedule:
+    - cron: '30 13 * * *' # Runs at 7:00 PM IST daily
+  workflow_dispatch:      # Allows you to click 'Run' manually
+
+jobs:
+  scrape_and_archive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install Libraries
+        run: pip install pandas requests beautifulsoup4 lxml
+
+      - name: Run Scraper
+        run: python scrape.py
+
+      - name: Commit Today's File
+        run: |
+          git config --global user.name "DailyBot"
+          git config --global user.email "bot@github.com"
+          git add data/*.csv
+          git commit -m "Archive prices for $(date +'%Y-%m-%d')"
+          git push
