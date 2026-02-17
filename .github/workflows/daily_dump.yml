@@ -2,8 +2,8 @@ name: Daily Price Dump
 
 on:
   schedule:
-    - cron: '30 13 * * *' # Runs at 7:00 PM IST daily
-  workflow_dispatch:      # Allows you to click 'Run' manually
+    - cron: '30 13 * * *' # 7:00 PM IST
+  workflow_dispatch:      # Manual trigger
 
 jobs:
   scrape_and_archive:
@@ -23,10 +23,15 @@ jobs:
       - name: Run Scraper
         run: python scrape.py
 
-      - name: Commit Today's File
+      - name: Commit and Push (Only if changes exist)
         run: |
           git config --global user.name "DailyBot"
           git config --global user.email "bot@github.com"
           git add data/*.csv
-          git commit -m "Archive prices for $(date +'%Y-%m-%d')"
-          git push
+          # This line checks if there are actually new files before committing
+          if [ -n "$(git status --porcelain)" ]; then
+            git commit -m "Archive prices for $(date +'%Y-%m-%d')"
+            git push
+          else
+            echo "No new data found today. Skipping commit."
+          fi
