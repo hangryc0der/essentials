@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 import datetime
 import os
 
-# The exact names to look for in the table
+# Target products from your list
 target_products = [
     "Rice", "Wheat", "Atta (Wheat)", "Gram Dal", "Tur/Arhar Dal", "Urad Dal", 
     "Moong Dal", "Masoor Dal", "Sugar", "Milk", "Groundnut Oil", "Soya Oil", 
@@ -16,42 +16,44 @@ target_products = [
 
 def scrape():
     url = "https://fcainfoweb.nic.in/Reports/DB/Dailyprices.aspx"
+    today = datetime.date.today().strftime("%Y-%m-%d")
+    
+    # Ensure data folder exists
+    if not os.path.exists('data'):
+        os.makedirs('data')
+
     try:
         response = requests.get(url, timeout=30)
         soup = BeautifulSoup(response.text, 'html.parser')
         table = soup.find('table', {'border': '1'})
         
-        new_data = []
-        today = datetime.date.today().strftime("%Y-%m-%d")
+        if not table:
+            print("Could not find table on page.")
+            return
 
+        extracted_data = []
         for row in table.find_all('tr'):
             cols = row.find_all('td')
             if len(cols) >= 11:
-                name = cols[0].text.strip()
-                # Fuzzy match: check if our target keyword is in the table row name
+                name = cols[0].get_text(strip=True)
+                # Fuzzy match to catch variations like "Milk (1Ltr)"
                 if any(target.lower() in name.lower() for target in target_products):
-                    new_data.append({
-                        "Date": today,
+                    extracted_data.append({
                         "Commodity": name,
-                        "Current_Price": cols[2].text.strip(),
-                        "One_Week_Back": cols[8].text.strip(),
-                        "One_Month_Back": cols[9].text.strip(),
-                        "One_Year_Back": cols[10].text.strip()
+                        "Current_Price": cols[2].get_text(strip=True),
+                        "One_Week_Back": cols[8].get_text(strip=True),
+                        "One_Month_Back": cols[9].get_text(strip=True),
+                        "One_Year_Back": cols[10].get_text(strip=True)
                     })
 
-        df_new = pd.DataFrame(new_data)
-        file_path = "data/prices.csv"
-
-        # Append to existing file if it exists, otherwise create it
-        if os.path.exists(file_path):
-            df_new.to_csv(file_path, mode='a', header=False, index=False)
-        else:
-            df_new.to_csv(file_path, index=False)
-        
-        print(f"Successfully added {len(new_data)} rows for {today}")
+        # Save to a NEW file for today
+        df = pd.DataFrame(extracted_data)
+        filename = f"data/prices_{today}.csv"
+        df.to_csv(filename, index=False)
+        print(f"File created: {filename} with {len(extracted_data)} items.")
 
     except Exception as e:
-        print(f"Error occurred: {e}")
+        print(f"Scraper failed: {e}")
 
 if __name__ == "__main__":
     scrape()
